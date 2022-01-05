@@ -16,7 +16,7 @@ fn main() {
     app.post("/turnir", |_, _| {
         println!("Post was sent successfully!");
 
-        Response::ok(String::from(""))
+        Response::created(String::from(""))
     });
 
     app.put("/turnir/:id", |_, params| {

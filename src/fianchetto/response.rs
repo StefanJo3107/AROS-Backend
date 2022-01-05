@@ -1,14 +1,36 @@
 pub struct Response {}
 
 impl Response {
-    pub fn ok(contents: String) -> String {
-        let status_line = "HTTP/1.1 200 OK";
-
+    fn response_format(status_line: &str, contents: String) -> String {
         format!(
             "{}\r\nContent-Length: {}\r\n\r\n{}",
             status_line,
             contents.len(),
             contents
         )
+    }
+
+    pub fn ok(contents: String) -> String {
+        let status_line = "HTTP/1.1 200 OK";
+
+        Response::response_format(status_line, contents)
+    }
+
+    pub fn created(contents: String) -> String {
+        let status_line = "HTTP/1.1 201 Created";
+
+        Response::response_format(status_line, contents)
+    }
+
+    pub fn bad_request() -> String {
+        let status_line = "HTTP/1.1 400 Bad Request";
+
+        format!("{}\r\n\r\n", status_line)
+    }
+
+    pub fn not_found() -> String {
+        let status_line = "HTTP/1.1 404 Not Found";
+
+        format!("{}\r\n\r\n", status_line)
     }
 }

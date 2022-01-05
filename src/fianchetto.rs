@@ -1,8 +1,10 @@
+pub mod request;
 pub mod response;
 pub mod route;
 
 use crate::concurrency::ThreadPool;
-use route::{Request, Route};
+use request::Request;
+use route::Route;
 use route_recognizer::{Params, Router};
 use std::collections::HashMap;
 use std::str;
@@ -113,18 +115,18 @@ fn handle_connection(mut stream: TcpStream, router: MutRouter) {
     stream.read(&mut buffer).unwrap();
 
     let buffer_str = str::from_utf8(&buffer).unwrap();
-    let split_buffer: Vec<&str> = buffer_str.split(" ").collect();
-    let method = split_buffer.get(0);
-    let path = split_buffer.get(1);
+
+    let request = Request::new(buffer_str);
 
     let router = router.lock().unwrap();
 
-    let route_match = router.recognize(path.unwrap()).unwrap();
+    let route_match = router.recognize(request.path).unwrap();
     let routes: &Vec<Route> = route_match.handler();
     let mut response = String::from("");
     for route in routes {
-        if route.method.eq(method.unwrap()) {
-            response = (route.action)(Request {}, route_match.params());
+        if route.method.eq(request.method) {
+            response = (route.action)(request, route_match.params());
+            break;
         }
     }
     stream.write(response.as_bytes()).unwrap();
