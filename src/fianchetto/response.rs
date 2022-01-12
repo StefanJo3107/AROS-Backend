@@ -1,4 +1,4 @@
-pub struct Response {}
+pub struct Response;
 
 impl Response {
     fn response_format(status_line: &str, contents: String) -> String {
@@ -28,9 +28,15 @@ impl Response {
         format!("{}\r\n\r\n", status_line)
     }
 
-    pub fn not_found() -> String {
+    pub fn bad_request_body(contents: String) -> String {
+        let status_line = "HTTP/1.1 400 Bad Request";
+
+        Response::response_format(status_line, contents)
+    }
+
+    pub fn not_found(contents: String) -> String {
         let status_line = "HTTP/1.1 404 Not Found";
 
-        format!("{}\r\n\r\n", status_line)
+        Response::response_format(status_line, contents)
     }
 }

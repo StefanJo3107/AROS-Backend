@@ -1,9 +1,10 @@
 use route_recognizer::Params;
 
-pub type RouteAction = Box<dyn Fn(super::request::Request, &Params) -> String + Send + 'static>;
+pub type RouteAction<T> =
+    Box<dyn Fn(super::request::Request, &Params, Option<&T>) -> String + Send>;
 
-pub struct Route {
+pub struct Route<T> {
     pub path: String,
     pub method: String,
-    pub action: RouteAction,
+    pub action: RouteAction<T>,
 }

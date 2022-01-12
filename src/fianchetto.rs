@@ -15,16 +15,22 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-type MutRouter = Arc<Mutex<Router<Vec<Route>>>>;
+use self::response::Response;
 
-pub struct Fianchetto {
+type MutRouter<T> = Arc<Mutex<Router<Vec<Route<T>>>>>;
+
+pub struct Fianchetto<T> {
     listener: TcpListener,
     pool: ThreadPool,
-    router: MutRouter,
-    routes: HashMap<&'static str, Vec<Route>>,
+    router: MutRouter<T>,
+    routes: HashMap<&'static str, Vec<Route<T>>>,
+    db_conn: Arc<Mutex<Option<T>>>,
 }
 
-impl Fianchetto {
+impl<T> Fianchetto<T>
+where
+    T: Send + 'static,
+{
     pub fn new(address: &str, num_of_threads: usize) -> Self {
         let listener = TcpListener::bind(address).unwrap();
         let pool = ThreadPool::new(num_of_threads);
@@ -37,6 +43,7 @@ impl Fianchetto {
             pool,
             router,
             routes,
+            db_conn: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -46,12 +53,18 @@ impl Fianchetto {
         for stream in self.listener.incoming() {
             let stream = stream.unwrap();
             let router = Arc::clone(&self.router);
+            let conn = Arc::clone(&self.db_conn);
+
             self.pool.execute(move || {
-                handle_connection(stream, router);
+                handle_connection(stream, router, conn);
             });
         }
 
         println!("Shutting down server!");
+    }
+
+    pub fn set_db_connection(&mut self, db_conn: T) {
+        self.db_conn = Arc::new(Mutex::new(Some(db_conn)));
     }
 
     fn set_router(&mut self) {
@@ -63,7 +76,7 @@ impl Fianchetto {
 
     fn request<F>(&mut self, path: &'static str, callback: F, method: String)
     where
-        F: Fn(Request, &Params) -> String + Send + 'static,
+        F: Fn(Request, &Params, Option<&T>) -> String + Send + 'static,
     {
         let action = Box::new(callback);
 
@@ -83,49 +96,55 @@ impl Fianchetto {
 
     pub fn get<F>(&mut self, path: &'static str, callback: F)
     where
-        F: Fn(Request, &Params) -> String + Send + 'static,
+        F: Fn(Request, &Params, Option<&T>) -> String + Send + 'static,
     {
         self.request(path, callback, String::from("GET"));
     }
 
     pub fn post<F>(&mut self, path: &'static str, callback: F)
     where
-        F: Fn(Request, &Params) -> String + Send + 'static,
+        F: Fn(Request, &Params, Option<&T>) -> String + Send + 'static,
     {
         self.request(path, callback, String::from("POST"));
     }
 
     pub fn put<F>(&mut self, path: &'static str, callback: F)
     where
-        F: Fn(Request, &Params) -> String + Send + 'static,
+        F: Fn(Request, &Params, Option<&T>) -> String + Send + 'static,
     {
         self.request(path, callback, String::from("PUT"));
     }
 
     pub fn delete<F>(&mut self, path: &'static str, callback: F)
     where
-        F: Fn(Request, &Params) -> String + Send + 'static,
+        F: Fn(Request, &Params, Option<&T>) -> String + Send + 'static,
     {
         self.request(path, callback, String::from("DELETE"));
     }
 }
 
-fn handle_connection(mut stream: TcpStream, router: MutRouter) {
+fn handle_connection<T>(
+    mut stream: TcpStream,
+    router: MutRouter<T>,
+    db_conn: Arc<Mutex<Option<T>>>,
+) {
     let mut buffer = [0; 1024];
     stream.read(&mut buffer).unwrap();
 
     let buffer_str = str::from_utf8(&buffer).unwrap();
 
-    let request = Request::new(buffer_str);
+    let request = Request::new(buffer_str).unwrap();
 
     let router = router.lock().unwrap();
+    let db_conn = db_conn.lock().unwrap();
+    let db_conn = db_conn.as_ref();
 
     let route_match = router.recognize(request.path).unwrap();
-    let routes: &Vec<Route> = route_match.handler();
-    let mut response = String::from("");
+    let routes: &Vec<Route<T>> = route_match.handler();
+    let mut response = Response::bad_request();
     for route in routes {
         if route.method.eq(request.method) {
-            response = (route.action)(request, route_match.params());
+            response = (route.action)(request, route_match.params(), db_conn);
             break;
         }
     }

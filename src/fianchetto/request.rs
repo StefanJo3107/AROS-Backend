@@ -1,13 +1,15 @@
+use serde_json::{Error, Value};
+
 pub struct Request<'a> {
     pub method: &'a str,
     pub path: &'a str,
     pub content_type: &'a str,
     pub content_length: usize,
-    pub content: String,
+    pub content: Value,
 }
 
 impl<'a> Request<'a> {
-    pub fn new(request: &str) -> Request {
+    pub fn new(request: &str) -> Result<Request, Error> {
         let lines: Vec<&str> = request.split("\r\n").collect();
         let first: Vec<&str> = lines.get(0).unwrap().split(" ").collect();
 
@@ -38,12 +40,18 @@ impl<'a> Request<'a> {
             }
         }
 
-        Request {
+        let mut content_json = Value::Null;
+        if content_type.to_lowercase().contains("json") {
+            let json = content.trim_matches('\u{0}');
+            content_json = serde_json::from_str(json)?;
+        }
+
+        Ok(Request {
             method,
             path,
             content_type,
             content_length,
-            content,
-        }
+            content: content_json,
+        })
     }
 }
