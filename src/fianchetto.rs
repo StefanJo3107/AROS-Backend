@@ -56,7 +56,9 @@ where
             let conn = Arc::clone(&self.db_conn);
 
             self.pool.execute(move || {
-                handle_connection(stream, router, conn);
+                if let Err(result) = handle_connection(stream, router, conn) {
+                    println!("Error: {}", result);
+                }
             });
         }
 
@@ -127,19 +129,19 @@ fn handle_connection<T>(
     mut stream: TcpStream,
     router: MutRouter<T>,
     db_conn: Arc<Mutex<Option<T>>>,
-) {
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut buffer = [0; 1024];
     stream.read(&mut buffer).unwrap();
 
-    let buffer_str = str::from_utf8(&buffer).unwrap();
+    let buffer_str = str::from_utf8(&buffer)?;
 
-    let request = Request::new(buffer_str).unwrap();
+    let request = Request::new(buffer_str)?;
 
     let router = router.lock().unwrap();
     let db_conn = db_conn.lock().unwrap();
     let db_conn = db_conn.as_ref();
 
-    let route_match = router.recognize(request.path).unwrap();
+    let route_match = router.recognize(request.path)?;
     let routes: &Vec<Route<T>> = route_match.handler();
     let mut response = Response::bad_request();
     for route in routes {
@@ -148,6 +150,8 @@ fn handle_connection<T>(
             break;
         }
     }
-    stream.write(response.as_bytes()).unwrap();
-    stream.flush().unwrap();
+    stream.write(response.as_bytes())?;
+    stream.flush()?;
+
+    Ok(())
 }
