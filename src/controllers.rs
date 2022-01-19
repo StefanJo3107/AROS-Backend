@@ -6,6 +6,7 @@ use diesel::{
 use crate::fianchetto::Fianchetto;
 
 pub mod lokacija_controller;
+pub mod sahista_controller;
 pub mod turnir_controller;
 
 pub trait Controller {

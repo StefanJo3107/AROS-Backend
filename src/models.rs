@@ -1,4 +1,4 @@
-use super::schema::{lokacija, turnir};
+use super::schema::{lokacija, sahista, turnir};
 use diesel::{Identifiable, Queryable};
 use serde::{Deserialize, Serialize};
 
@@ -33,5 +33,28 @@ pub struct NewTurnir {
     pub turnir_naziv: String,
     pub turnir_datum: String,
     pub broj_rundi: i32,
+    pub lokacija_id: Option<i32>,
+}
+
+#[derive(Identifiable, Queryable, Serialize, Associations)]
+#[primary_key(sahista_id)]
+#[belongs_to(Lokacija)]
+#[table_name = "sahista"]
+pub struct Sahista {
+    pub sahista_id: i32,
+    pub titula_fide: String,
+    pub elo: i32,
+    pub ime: String,
+    pub prezime: String,
+    pub lokacija_id: Option<i32>,
+}
+
+#[derive(Insertable, Deserialize)]
+#[table_name = "sahista"]
+pub struct NewSahista {
+    pub titula_fide: String,
+    pub elo: i32,
+    pub ime: String,
+    pub prezime: String,
     pub lokacija_id: Option<i32>,
 }
