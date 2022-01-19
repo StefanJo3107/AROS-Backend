@@ -82,7 +82,7 @@ impl Controller for SahistaController {
                 Err(err) => {
                     let err = err.to_string();
                     let err_json = json!({ "err": err });
-                    return Response::not_found(serde_json::to_string(&err_json).unwrap());
+                    return Response::bad_request_body(serde_json::to_string(&err_json).unwrap());
                 }
             }
 
@@ -97,7 +97,7 @@ impl Controller for SahistaController {
                 Err(err) => {
                     let err = err.to_string();
                     let err_json = json!({ "err": err });
-                    return Response::not_found(serde_json::to_string(&err_json).unwrap());
+                    return Response::bad_request_body(serde_json::to_string(&err_json).unwrap());
                 }
             }
 
@@ -122,6 +122,7 @@ impl SahistaController {
                 dsl::ime.eq(sahista.ime),
                 dsl::prezime.eq(sahista.prezime),
                 dsl::lokacija_id.eq(sahista.lokacija_id),
+                dsl::sahista_slika.eq(sahista.sahista_slika),
             ))
             .get_result(conn)
     }

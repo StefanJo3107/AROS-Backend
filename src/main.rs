@@ -2,6 +2,7 @@ use diesel::prelude::*;
 use diesel::r2d2::ConnectionManager;
 use diesel::r2d2::Pool;
 use micro_backend_framework::controllers::lokacija_controller::LokacijaController;
+use micro_backend_framework::controllers::partija_controller::PartijaController;
 use micro_backend_framework::controllers::sahista_controller::SahistaController;
 use micro_backend_framework::controllers::turnir_controller::TurnirController;
 use micro_backend_framework::controllers::Controller;
@@ -16,6 +17,7 @@ fn main() {
     LokacijaController::routes(&mut app);
     TurnirController::routes(&mut app);
     SahistaController::routes(&mut app);
+    PartijaController::routes(&mut app);
 
     app.listen();
 }

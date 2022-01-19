@@ -138,6 +138,7 @@ impl TurnirController {
                 dsl::broj_rundi.eq(turnir.broj_rundi),
                 dsl::lokacija_id.eq(turnir.lokacija_id),
                 dsl::turnir_datum.eq(turnir.turnir_datum),
+                dsl::turnir_slika.eq(turnir.turnir_slika),
             ))
             .get_result(conn)
     }
