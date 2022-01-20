@@ -21,88 +21,45 @@ impl Controller for SahistaController {
                 Err(err) => {
                     let err = err.to_string();
                     let err_json = json!({ "err": err });
-                    return Response::not_found(serde_json::to_string(&err_json).unwrap());
+                    return Ok(Response::not_found(serde_json::to_string(&err_json)?));
                 }
             }
 
-            let sahisti_json = serde_json::to_string(&sahisti).unwrap();
-            Response::ok(sahisti_json)
+            let sahisti_json = serde_json::to_string(&sahisti)?;
+            Ok(Response::ok(sahisti_json))
         });
 
         app.get("/sahista/:id", |_, params, conn_pool| {
-            let sahista_id: i32 = params.find("id").unwrap().parse().unwrap();
-            let sahista: Sahista;
-            match dsl::sahista
+            let sahista_id: i32 = params.find("id").unwrap().parse()?;
+            let sahista: Sahista = dsl::sahista
                 .filter(dsl::sahista_id.eq(sahista_id))
-                .first(&conn_pool.unwrap().get().unwrap())
-            {
-                Ok(s) => sahista = s,
-                Err(err) => {
-                    let err = err.to_string();
-                    let err_json = json!({ "err": err });
-                    return Response::not_found(serde_json::to_string(&err_json).unwrap());
-                }
-            }
+                .first(&conn_pool.unwrap().get().unwrap())?;
 
-            let sahista_json = serde_json::to_string(&sahista).unwrap();
-            Response::ok(sahista_json)
+            let sahista_json = serde_json::to_string(&sahista)?;
+            Ok(Response::ok(sahista_json))
         });
 
         app.post("/sahista", |req, _, conn_pool| {
-            let new_sahista: NewSahista;
-            match serde_json::from_value(req.content) {
-                Ok(n) => new_sahista = n,
-                Err(err) => {
-                    return Response::bad_request_body(
-                        serde_json::to_string(&json!({"err": err.to_string()})).unwrap(),
-                    )
-                }
-            }
+            let new_sahista: NewSahista = serde_json::from_value(req.content)?;
+            let sahista: Sahista =
+                SahistaController::create_sahista(&conn_pool.unwrap().get().unwrap(), new_sahista)?;
 
-            let sahista: Sahista;
-            match SahistaController::create_sahista(&conn_pool.unwrap().get().unwrap(), new_sahista)
-            {
-                Ok(s) => sahista = s,
-                Err(err) => {
-                    return Response::bad_request_body(
-                        serde_json::to_string(&json!({"err": err.to_string()})).unwrap(),
-                    )
-                }
-            }
-
-            let sahista_json = serde_json::to_string(&sahista).unwrap();
-            Response::created(sahista_json)
+            let sahista_json = serde_json::to_string(&sahista)?;
+            Ok(Response::created(sahista_json))
         });
 
         app.put("/sahista/:id", |req, params, conn_pool| {
             let sahista_id: i32 = params.find("id").unwrap().parse().unwrap();
-            let upd_sahista: NewSahista;
-            match serde_json::from_value(req.content) {
-                Ok(u) => upd_sahista = u,
-                Err(err) => {
-                    let err = err.to_string();
-                    let err_json = json!({ "err": err });
-                    return Response::bad_request_body(serde_json::to_string(&err_json).unwrap());
-                }
-            }
+            let upd_sahista: NewSahista = serde_json::from_value(req.content)?;
 
-            let sahista: Sahista;
-
-            match SahistaController::update_sahista(
+            let sahista: Sahista = SahistaController::update_sahista(
                 &conn_pool.unwrap().get().unwrap(),
                 sahista_id,
                 upd_sahista,
-            ) {
-                Ok(s) => sahista = s,
-                Err(err) => {
-                    let err = err.to_string();
-                    let err_json = json!({ "err": err });
-                    return Response::bad_request_body(serde_json::to_string(&err_json).unwrap());
-                }
-            }
+            )?;
 
-            let sahista_json = serde_json::to_string(&sahista).unwrap();
-            Response::ok(sahista_json)
+            let sahista_json = serde_json::to_string(&sahista)?;
+            Ok(Response::ok(sahista_json))
         });
     }
 }

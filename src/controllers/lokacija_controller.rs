@@ -20,16 +20,16 @@ impl Controller for LokacijaController {
                 Err(err) => {
                     let err = err.to_string();
                     let err_json = json!({ "err": err });
-                    return Response::not_found(serde_json::to_string(&err_json).unwrap());
+                    return Ok(Response::not_found(serde_json::to_string(&err_json)?));
                 }
             }
 
-            let lok_json = serde_json::to_string(&results).unwrap();
-            Response::ok(lok_json)
+            let lok_json = serde_json::to_string(&results)?;
+            Ok(Response::ok(lok_json))
         });
 
         app.get("/lokacija/:id", |_, params, conn_pool| {
-            let lok_id: i32 = params.find("id").unwrap().parse().unwrap();
+            let lok_id: i32 = params.find("id").unwrap().parse()?;
             let result: Lokacija;
             match lokacija::dsl::lokacija
                 .filter(lokacija::dsl::id.eq(lok_id))
@@ -39,12 +39,12 @@ impl Controller for LokacijaController {
                 Err(err) => {
                     let err = err.to_string();
                     let err_json = json!({ "err": err });
-                    return Response::not_found(serde_json::to_string(&err_json).unwrap());
+                    return Ok(Response::not_found(serde_json::to_string(&err_json)?));
                 }
             };
 
-            let lok_json = serde_json::to_string(&result).unwrap();
-            Response::ok(lok_json)
+            let lok_json = serde_json::to_string(&result)?;
+            Ok(Response::ok(lok_json))
         });
 
         app.post("/lokacija", |req, _, conn_pool| {
@@ -52,16 +52,16 @@ impl Controller for LokacijaController {
             match req.content["naziv"].as_str() {
                 Some(n) => lok_naziv = n,
                 None => {
-                    return Response::bad_request_body(
-                        serde_json::to_string(&json!({"err": "Incorrect body format"})).unwrap(),
-                    )
+                    return Ok(Response::bad_request_body(serde_json::to_string(
+                        &json!({"err": "Incorrect body format"}),
+                    )?))
                 }
             };
             let lok =
-                LokacijaController::create_lokacija(&conn_pool.unwrap().get().unwrap(), lok_naziv);
+                LokacijaController::create_lokacija(&conn_pool.unwrap().get().unwrap(), lok_naziv)?;
 
-            let lok_json = serde_json::to_string(&lok).unwrap();
-            Response::created(lok_json)
+            let lok_json = serde_json::to_string(&lok)?;
+            Ok(Response::created(lok_json))
         });
     }
 }
@@ -71,12 +71,14 @@ impl LokacijaController {
         lokacija::dsl::lokacija.load(conn)
     }
 
-    fn create_lokacija(conn: &PgConnection, naziv: &str) -> Lokacija {
+    fn create_lokacija(
+        conn: &PgConnection,
+        naziv: &str,
+    ) -> Result<Lokacija, diesel::result::Error> {
         let new_lokacija = NewLokacija { naziv };
 
         diesel::insert_into(lokacija::table)
             .values(&new_lokacija)
             .get_result(conn)
-            .expect("Error saving new lokacija")
     }
 }

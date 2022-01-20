@@ -21,16 +21,16 @@ impl Controller for TurnirController {
                 Err(err) => {
                     let err = err.to_string();
                     let err_json = json!({ "err": err });
-                    return Response::not_found(serde_json::to_string(&err_json).unwrap());
+                    return Ok(Response::not_found(serde_json::to_string(&err_json)?));
                 }
             }
 
-            let turniri_json = serde_json::to_string(&turniri).unwrap();
-            Response::ok(turniri_json)
+            let turniri_json = serde_json::to_string(&turniri)?;
+            Ok(Response::ok(turniri_json))
         });
 
         app.get("/turnir/:id", |_, params, conn_pool| {
-            let turnir_id: i32 = params.find("id").unwrap().parse().unwrap();
+            let turnir_id: i32 = params.find("id").unwrap().parse()?;
             let turnir: Turnir;
             match turnir::dsl::turnir
                 .filter(turnir::dsl::turnir_id.eq(turnir_id))
@@ -40,80 +40,48 @@ impl Controller for TurnirController {
                 Err(err) => {
                     let err = err.to_string();
                     let err_json = json!({ "err": err });
-                    return Response::not_found(serde_json::to_string(&err_json).unwrap());
+                    return Ok(Response::not_found(serde_json::to_string(&err_json)?));
                 }
             }
 
-            let turnir_json = serde_json::to_string(&turnir).unwrap();
-            Response::ok(turnir_json)
+            let turnir_json = serde_json::to_string(&turnir)?;
+            Ok(Response::ok(turnir_json))
         });
 
         app.post("/turnir", |req, _, conn_pool| {
-            let new_turnir: NewTurnir;
-            match serde_json::from_value(req.content) {
-                Ok(n) => new_turnir = n,
-                Err(err) => {
-                    return Response::bad_request_body(
-                        serde_json::to_string(&json!({ "err": err.to_string() })).unwrap(),
-                    )
-                }
-            };
+            let new_turnir: NewTurnir = serde_json::from_value(req.content)?;
 
-            let turnir: Turnir;
-            match TurnirController::create_turnir(&conn_pool.unwrap().get().unwrap(), new_turnir) {
-                Ok(t) => turnir = t,
-                Err(err) => {
-                    return Response::bad_request_body(
-                        serde_json::to_string(&json!({ "err": err.to_string() })).unwrap(),
-                    )
-                }
-            };
+            let turnir: Turnir =
+                TurnirController::create_turnir(&conn_pool.unwrap().get().unwrap(), new_turnir)?;
 
-            let turnir_json = serde_json::to_string(&turnir).unwrap();
-            Response::created(turnir_json)
+            let turnir_json = serde_json::to_string(&turnir)?;
+            Ok(Response::created(turnir_json))
         });
 
         app.delete("/turnir/:id", |_, params, conn_pool| {
-            let turnir_id: i32 = params.find("id").unwrap().parse().unwrap();
+            let turnir_id: i32 = params.find("id").unwrap().parse()?;
             match TurnirController::delete_turnir(&conn_pool.unwrap().get().unwrap(), turnir_id) {
-                Ok(()) => Response::ok(String::from("")),
+                Ok(()) => Ok(Response::ok(String::from(""))),
                 Err(err) => {
-                    return Response::bad_request_body(
-                        serde_json::to_string(&json!({ "err": err.to_string() })).unwrap(),
-                    )
+                    return Ok(Response::bad_request_body(serde_json::to_string(
+                        &json!({ "err": err.to_string() }),
+                    )?))
                 }
             }
         });
 
         app.put("/turnir/:id", |req, params, conn_pool| {
-            let turnir_id: i32 = params.find("id").unwrap().parse().unwrap();
-            let upd_turnir: NewTurnir;
-            match serde_json::from_value(req.content) {
-                Ok(u) => upd_turnir = u,
-                Err(err) => {
-                    return Response::bad_request_body(
-                        serde_json::to_string(&json!({ "err": err.to_string() })).unwrap(),
-                    )
-                }
-            };
+            let turnir_id: i32 = params.find("id").unwrap().parse()?;
+            let upd_turnir: NewTurnir = serde_json::from_value(req.content)?;
 
-            let turnir: Turnir;
-
-            match TurnirController::update_turnir(
+            let turnir: Turnir = TurnirController::update_turnir(
                 &conn_pool.unwrap().get().unwrap(),
                 turnir_id,
                 upd_turnir,
-            ) {
-                Ok(t) => turnir = t,
-                Err(err) => {
-                    return Response::bad_request_body(
-                        serde_json::to_string(&json!({ "err": err.to_string() })).unwrap(),
-                    )
-                }
-            }
+            )?;
 
-            let turnir_json = serde_json::to_string(&turnir).unwrap();
-            Response::ok(turnir_json)
+            let turnir_json = serde_json::to_string(&turnir)?;
+            Ok(Response::ok(turnir_json))
         });
     }
 }

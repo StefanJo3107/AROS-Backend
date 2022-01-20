@@ -6,6 +6,7 @@ use crate::concurrency::ThreadPool;
 use request::Request;
 use route::Route;
 use route_recognizer::{Params, Router};
+use serde_json::json;
 use std::collections::HashMap;
 use std::str;
 
@@ -78,7 +79,9 @@ where
 
     fn request<F>(&mut self, path: &'static str, callback: F, method: String)
     where
-        F: Fn(Request, &Params, Option<&T>) -> String + Send + 'static,
+        F: Fn(Request, &Params, Option<&T>) -> Result<String, Box<dyn std::error::Error>>
+            + Send
+            + 'static,
     {
         let action = Box::new(callback);
 
@@ -98,30 +101,38 @@ where
 
     pub fn get<F>(&mut self, path: &'static str, callback: F)
     where
-        F: Fn(Request, &Params, Option<&T>) -> String + Send + 'static,
+        F: Fn(Request, &Params, Option<&T>) -> Result<String, Box<dyn std::error::Error>>
+            + Send
+            + 'static,
     {
-        self.request(path, callback, String::from("GET"));
+        self.request(path, callback, String::from("GET"))
     }
 
     pub fn post<F>(&mut self, path: &'static str, callback: F)
     where
-        F: Fn(Request, &Params, Option<&T>) -> String + Send + 'static,
+        F: Fn(Request, &Params, Option<&T>) -> Result<String, Box<dyn std::error::Error>>
+            + Send
+            + 'static,
     {
-        self.request(path, callback, String::from("POST"));
+        self.request(path, callback, String::from("POST"))
     }
 
     pub fn put<F>(&mut self, path: &'static str, callback: F)
     where
-        F: Fn(Request, &Params, Option<&T>) -> String + Send + 'static,
+        F: Fn(Request, &Params, Option<&T>) -> Result<String, Box<dyn std::error::Error>>
+            + Send
+            + 'static,
     {
-        self.request(path, callback, String::from("PUT"));
+        self.request(path, callback, String::from("PUT"))
     }
 
     pub fn delete<F>(&mut self, path: &'static str, callback: F)
     where
-        F: Fn(Request, &Params, Option<&T>) -> String + Send + 'static,
+        F: Fn(Request, &Params, Option<&T>) -> Result<String, Box<dyn std::error::Error>>
+            + Send
+            + 'static,
     {
-        self.request(path, callback, String::from("DELETE"));
+        self.request(path, callback, String::from("DELETE"))
     }
 }
 
@@ -146,7 +157,15 @@ fn handle_connection<T>(
     let mut response = Response::bad_request();
     for route in routes {
         if route.method.eq(request.method) {
-            response = (route.action)(request, route_match.params(), db_conn);
+            let response_res = (route.action)(request, route_match.params(), db_conn);
+            match response_res {
+                Ok(r) => response = r,
+                Err(err) => {
+                    let err = err.to_string();
+                    let err_json = json!({ "err": err });
+                    response = Response::bad_request_body(serde_json::to_string(&err_json)?);
+                }
+            }
             break;
         }
     }

@@ -21,16 +21,16 @@ impl Controller for PartijaController {
                 Err(err) => {
                     let err = err.to_string();
                     let err_json = json!({ "err": err });
-                    return Response::not_found(serde_json::to_string(&err_json).unwrap());
+                    return Ok(Response::not_found(serde_json::to_string(&err_json)?));
                 }
             }
 
-            let partije_json = serde_json::to_string(&partije).unwrap();
-            Response::ok(partije_json)
+            let partije_json = serde_json::to_string(&partije)?;
+            Ok(Response::ok(partije_json))
         });
 
         app.get("/partija/:id", |_, params, conn_pool| {
-            let partija_id: i32 = params.find("id").unwrap().parse().unwrap();
+            let partija_id: i32 = params.find("id").unwrap().parse()?;
             let partija: Partija;
             match dsl::partija
                 .filter(dsl::partija_id.eq(partija_id))
@@ -40,68 +40,34 @@ impl Controller for PartijaController {
                 Err(err) => {
                     let err = err.to_string();
                     let err_json = json!({ "err": err });
-                    return Response::not_found(serde_json::to_string(&err_json).unwrap());
+                    return Ok(Response::not_found(serde_json::to_string(&err_json)?));
                 }
             }
 
-            let partija_json = serde_json::to_string(&partija).unwrap();
-            Response::ok(partija_json)
+            let partija_json = serde_json::to_string(&partija)?;
+            Ok(Response::ok(partija_json))
         });
 
         app.post("/partija", |req, _, conn_pool| {
-            let new_partija: NewPartija;
-            match serde_json::from_value(req.content) {
-                Ok(n) => new_partija = n,
-                Err(err) => {
-                    return Response::bad_request_body(
-                        serde_json::to_string(&json!({"err": err.to_string()})).unwrap(),
-                    )
-                }
-            }
+            let new_partija: NewPartija = serde_json::from_value(req.content)?;
+            let partija: Partija =
+                PartijaController::create_partija(&conn_pool.unwrap().get().unwrap(), new_partija)?;
 
-            let partija: Partija;
-            match PartijaController::create_partija(&conn_pool.unwrap().get().unwrap(), new_partija)
-            {
-                Ok(p) => partija = p,
-                Err(err) => {
-                    return Response::bad_request_body(
-                        serde_json::to_string(&json!({"err": err.to_string()})).unwrap(),
-                    )
-                }
-            }
-
-            let partija_json = serde_json::to_string(&partija).unwrap();
-            Response::created(partija_json)
+            let partija_json = serde_json::to_string(&partija)?;
+            Ok(Response::created(partija_json))
         });
 
         app.put("/partija/:id", |req, params, conn_pool| {
-            let partija_id: i32 = params.find("id").unwrap().parse().unwrap();
-            let upd_partija: NewPartija;
-            match serde_json::from_value(req.content) {
-                Ok(u) => upd_partija = u,
-                Err(err) => {
-                    let err = err.to_string();
-                    let err_json = json!({ "err": err });
-                    return Response::bad_request_body(serde_json::to_string(&err_json).unwrap());
-                }
-            }
-
-            let partija: Partija;
-            match PartijaController::update_partija(
+            let partija_id: i32 = params.find("id").unwrap().parse()?;
+            let upd_partija: NewPartija = serde_json::from_value(req.content)?;
+            let partija: Partija = PartijaController::update_partija(
                 &conn_pool.unwrap().get().unwrap(),
                 partija_id,
                 upd_partija,
-            ) {
-                Ok(p) => partija = p,
-                Err(err) => {
-                    let err = err.to_string();
-                    let err_json = json!({ "err": err });
-                    return Response::bad_request_body(serde_json::to_string(&err_json).unwrap());
-                }
-            }
+            )?;
 
-            let partija_json = serde_json::to_string(&partija).unwrap();
-            Response::ok(partija_json)
+            let partija_json = serde_json::to_string(&partija)?;
+            Ok(Response::ok(partija_json))
         });
     }
 }
