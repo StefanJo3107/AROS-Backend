@@ -3,7 +3,7 @@ pub struct Response;
 impl Response {
     fn response_format(status_line: &str, contents: String) -> String {
         format!(
-            "{}\r\nContent-Length: {}\r\n\r\n{}",
+            "{}\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\n\r\n{}",
             status_line,
             contents.len(),
             contents
@@ -38,5 +38,12 @@ impl Response {
         let status_line = "HTTP/1.1 404 Not Found";
 
         Response::response_format(status_line, contents)
+    }
+
+    pub fn no_content() -> String {
+        format!(
+            "{}\r\nConnection: keep-alive\r\nAccess-Control-Allow-Origin: *\r\nAllow: GET, POST, PUT, DELETE\r\nAccess-Control-Allow-Methods: POST, GET, OPTIONS, DELETE, PUT\r\nAccess-Control-Max-Age: 86400\r\nAccess-Control-Allow-Headers: *\r\n",
+            "HTTP/1.1 204 No Content"
+        )
     }
 }

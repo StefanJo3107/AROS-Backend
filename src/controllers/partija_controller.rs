@@ -48,6 +48,26 @@ impl Controller for PartijaController {
             Ok(Response::ok(partija_json))
         });
 
+        app.get("/partija-turnir/:turnir_id", |_, params, conn_pool| {
+            let turnir_id: i32 = params.find("turnir_id").unwrap().parse()?;
+            let partije: Vec<Partija>;
+            match dsl::partija
+                .filter(dsl::turnir_id.eq(turnir_id))
+                .load(&conn_pool.unwrap().get().unwrap())
+            {
+                Ok(p) => partije = p,
+
+                Err(err) => {
+                    let err = err.to_string();
+                    let err_json = json!({ "err": err });
+                    return Ok(Response::not_found(serde_json::to_string(&err_json)?));
+                }
+            }
+
+            let partije_json = serde_json::to_string(&partije)?;
+            Ok(Response::ok(partije_json))
+        });
+
         app.post("/partija", |req, _, conn_pool| {
             let new_partija: NewPartija = serde_json::from_value(req.content)?;
             let partija: Partija =

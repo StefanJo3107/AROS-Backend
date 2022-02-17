@@ -141,7 +141,7 @@ fn handle_connection<T>(
     router: MutRouter<T>,
     db_conn: Arc<Mutex<Option<T>>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut buffer = [0; 1024];
+    let mut buffer = [0; 8192];
     stream.read(&mut buffer).unwrap();
 
     let buffer_str = str::from_utf8(&buffer)?;
@@ -156,7 +156,11 @@ fn handle_connection<T>(
     let routes: &Vec<Route<T>> = route_match.handler();
     let mut response = Response::bad_request();
     for route in routes {
-        if route.method.eq(request.method) {
+        //preflight
+        if request.method.eq("OPTIONS") {
+            response = Response::no_content();
+            break;
+        } else if route.method.eq(request.method) {
             let response_res = (route.action)(request, route_match.params(), db_conn);
             match response_res {
                 Ok(r) => response = r,

@@ -13,8 +13,14 @@ impl<'a> Request<'a> {
         let lines: Vec<&str> = request.split("\r\n").collect();
         let first: Vec<&str> = lines.get(0).unwrap().split(" ").collect();
 
-        let method = first.get(0).unwrap();
-        let path = first.get(1).unwrap();
+        let mut method = "";
+        if let Some(m) = first.get(0) {
+            method = m;
+        }
+        let mut path = "";
+        if let Some(p) = first.get(1) {
+            path = p;
+        }
 
         let mut content_type = "";
         let mut content_length: usize = 0;
@@ -31,15 +37,14 @@ impl<'a> Request<'a> {
                 let mut length: &str = content_length_vec.get(1).unwrap();
                 length = &length[1..];
                 content_length = length.parse().unwrap();
+            } else if line.contains("{") {
                 content_started = true;
-                continue;
             }
 
             if content_started {
                 content += line;
             }
         }
-
         let mut content_json = Value::Null;
         if content_type.to_lowercase().contains("json") {
             let json = content.trim_matches('\u{0}');
