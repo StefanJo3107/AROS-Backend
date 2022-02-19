@@ -13,51 +13,43 @@ use std::str;
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 use self::response::Response;
 
-type MutRouter<T> = Arc<Mutex<Router<Vec<Route<T>>>>>;
+type VecRouter = Router<Vec<Route>>;
 
-pub struct Fianchetto<T> {
+pub struct Fianchetto {
     listener: TcpListener,
     pool: ThreadPool,
-    router: MutRouter<T>,
-    routes: HashMap<&'static str, Vec<Route<T>>>,
-    db_conn: Arc<Mutex<Option<T>>>,
+    routes: HashMap<&'static str, Vec<Route>>,
 }
 
-impl<T> Fianchetto<T>
-where
-    T: Send + 'static,
-{
+impl Fianchetto {
     pub fn new(address: &str, num_of_threads: usize) -> Self {
         let listener = TcpListener::bind(address).unwrap();
         let pool = ThreadPool::new(num_of_threads);
-        let router = Router::new();
-        let router = Arc::new(Mutex::new(router));
         let routes = HashMap::new();
 
         Fianchetto {
             listener,
             pool,
-            router,
             routes,
-            db_conn: Arc::new(Mutex::new(None)),
         }
     }
 
     pub fn listen(&mut self) {
-        self.set_router();
+        let mut router = Router::new();
+        self.set_router(&mut router);
+        let arc_router = Arc::new(router);
 
         for stream in self.listener.incoming() {
             let stream = stream.unwrap();
-            let router = Arc::clone(&self.router);
-            let conn = Arc::clone(&self.db_conn);
+            let router = Arc::clone(&arc_router);
 
             self.pool.execute(move || {
-                if let Err(result) = handle_connection(stream, router, conn) {
+                if let Err(result) = handle_connection(stream, router) {
                     println!("Error: {}", result);
                 }
             });
@@ -66,12 +58,7 @@ where
         println!("Shutting down server!");
     }
 
-    pub fn set_db_connection(&mut self, db_conn: T) {
-        self.db_conn = Arc::new(Mutex::new(Some(db_conn)));
-    }
-
-    fn set_router(&mut self) {
-        let mut router = self.router.lock().unwrap();
+    fn set_router(&mut self, router: &mut VecRouter) {
         for (path, routes) in self.routes.drain() {
             router.add(path, routes);
         }
@@ -79,8 +66,9 @@ where
 
     fn request<F>(&mut self, path: &'static str, callback: F, method: String)
     where
-        F: Fn(Request, &Params, Option<&T>) -> Result<String, Box<dyn std::error::Error>>
+        F: Fn(Request, &Params) -> Result<String, Box<dyn std::error::Error>>
             + Send
+            + Sync
             + 'static,
     {
         let action = Box::new(callback);
@@ -91,7 +79,7 @@ where
             action,
         };
 
-        if self.routes.contains_key(path) == false {
+        if !self.routes.contains_key(path) {
             let vec = vec![route];
             self.routes.insert(path, vec);
         } else {
@@ -101,8 +89,9 @@ where
 
     pub fn get<F>(&mut self, path: &'static str, callback: F)
     where
-        F: Fn(Request, &Params, Option<&T>) -> Result<String, Box<dyn std::error::Error>>
+        F: Fn(Request, &Params) -> Result<String, Box<dyn std::error::Error>>
             + Send
+            + Sync
             + 'static,
     {
         self.request(path, callback, String::from("GET"))
@@ -110,8 +99,9 @@ where
 
     pub fn post<F>(&mut self, path: &'static str, callback: F)
     where
-        F: Fn(Request, &Params, Option<&T>) -> Result<String, Box<dyn std::error::Error>>
+        F: Fn(Request, &Params) -> Result<String, Box<dyn std::error::Error>>
             + Send
+            + Sync
             + 'static,
     {
         self.request(path, callback, String::from("POST"))
@@ -119,8 +109,9 @@ where
 
     pub fn put<F>(&mut self, path: &'static str, callback: F)
     where
-        F: Fn(Request, &Params, Option<&T>) -> Result<String, Box<dyn std::error::Error>>
+        F: Fn(Request, &Params) -> Result<String, Box<dyn std::error::Error>>
             + Send
+            + Sync
             + 'static,
     {
         self.request(path, callback, String::from("PUT"))
@@ -128,18 +119,18 @@ where
 
     pub fn delete<F>(&mut self, path: &'static str, callback: F)
     where
-        F: Fn(Request, &Params, Option<&T>) -> Result<String, Box<dyn std::error::Error>>
+        F: Fn(Request, &Params) -> Result<String, Box<dyn std::error::Error>>
             + Send
+            + Sync
             + 'static,
     {
         self.request(path, callback, String::from("DELETE"))
     }
 }
 
-fn handle_connection<T>(
+fn handle_connection(
     mut stream: TcpStream,
-    router: MutRouter<T>,
-    db_conn: Arc<Mutex<Option<T>>>,
+    router: Arc<VecRouter>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut buffer = [0; 8192];
     stream.read(&mut buffer).unwrap();
@@ -148,12 +139,8 @@ fn handle_connection<T>(
 
     let request = Request::new(buffer_str)?;
 
-    let router = router.lock().unwrap();
-    let db_conn = db_conn.lock().unwrap();
-    let db_conn = db_conn.as_ref();
-
     let route_match = router.recognize(request.path)?;
-    let routes: &Vec<Route<T>> = route_match.handler();
+    let routes: &Vec<Route> = route_match.handler();
     let mut response = Response::bad_request();
     for route in routes {
         //preflight
@@ -161,7 +148,7 @@ fn handle_connection<T>(
             response = Response::no_content();
             break;
         } else if route.method.eq(request.method) {
-            let response_res = (route.action)(request, route_match.params(), db_conn);
+            let response_res = (route.action)(request, route_match.params());
             match response_res {
                 Ok(r) => response = r,
                 Err(err) => {

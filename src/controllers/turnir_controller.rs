@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::models::{NewTurnir, Turnir};
 
 use super::Controller;
@@ -13,10 +15,11 @@ use crate::schema::turnir;
 pub struct TurnirController;
 
 impl Controller for TurnirController {
-    fn routes(app: &mut Fianchetto<Pool<ConnectionManager<PgConnection>>>) {
-        app.get("/turnir", |_, _, conn_pool| {
+    fn routes(app: &mut Fianchetto, conn_pool: Arc<Pool<ConnectionManager<PgConnection>>>) {
+        let conn = Arc::clone(&conn_pool);
+        app.get("/turnir", move |_, _| {
             let turniri: Vec<Turnir>;
-            match turnir::dsl::turnir.load(&conn_pool.unwrap().get().unwrap()) {
+            match turnir::dsl::turnir.load(&conn.get().unwrap()) {
                 Ok(t) => turniri = t,
                 Err(err) => {
                     let err = err.to_string();
@@ -29,12 +32,13 @@ impl Controller for TurnirController {
             Ok(Response::ok(turniri_json))
         });
 
-        app.get("/turnir/:id", |_, params, conn_pool| {
+        let conn = Arc::clone(&conn_pool);
+        app.get("/turnir/:id", move |_, params| {
             let turnir_id: i32 = params.find("id").unwrap().parse()?;
             let turnir: Turnir;
             match turnir::dsl::turnir
                 .filter(turnir::dsl::turnir_id.eq(turnir_id))
-                .first(&conn_pool.unwrap().get().unwrap())
+                .first(&conn.get().unwrap())
             {
                 Ok(t) => turnir = t,
                 Err(err) => {
@@ -48,19 +52,20 @@ impl Controller for TurnirController {
             Ok(Response::ok(turnir_json))
         });
 
-        app.post("/turnir", |req, _, conn_pool| {
+        let conn = Arc::clone(&conn_pool);
+        app.post("/turnir", move |req, _| {
             let new_turnir: NewTurnir = serde_json::from_value(req.content)?;
 
-            let turnir: Turnir =
-                TurnirController::create_turnir(&conn_pool.unwrap().get().unwrap(), new_turnir)?;
+            let turnir: Turnir = TurnirController::create_turnir(&conn.get().unwrap(), new_turnir)?;
 
             let turnir_json = serde_json::to_string(&turnir)?;
             Ok(Response::created(turnir_json))
         });
 
-        app.delete("/turnir/:id", |_, params, conn_pool| {
+        let conn = Arc::clone(&conn_pool);
+        app.delete("/turnir/:id", move |_, params| {
             let turnir_id: i32 = params.find("id").unwrap().parse()?;
-            match TurnirController::delete_turnir(&conn_pool.unwrap().get().unwrap(), turnir_id) {
+            match TurnirController::delete_turnir(&conn.get().unwrap(), turnir_id) {
                 Ok(()) => Ok(Response::ok(String::from(""))),
                 Err(err) => {
                     return Ok(Response::bad_request_body(serde_json::to_string(
@@ -70,15 +75,13 @@ impl Controller for TurnirController {
             }
         });
 
-        app.put("/turnir/:id", |req, params, conn_pool| {
+        let conn = Arc::clone(&conn_pool);
+        app.put("/turnir/:id", move |req, params| {
             let turnir_id: i32 = params.find("id").unwrap().parse()?;
             let upd_turnir: NewTurnir = serde_json::from_value(req.content)?;
 
-            let turnir: Turnir = TurnirController::update_turnir(
-                &conn_pool.unwrap().get().unwrap(),
-                turnir_id,
-                upd_turnir,
-            )?;
+            let turnir: Turnir =
+                TurnirController::update_turnir(&conn.get().unwrap(), turnir_id, upd_turnir)?;
 
             let turnir_json = serde_json::to_string(&turnir)?;
             Ok(Response::ok(turnir_json))

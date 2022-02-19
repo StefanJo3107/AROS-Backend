@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::Error;
@@ -13,10 +15,11 @@ use crate::schema::partija::dsl;
 pub struct PartijaController;
 
 impl Controller for PartijaController {
-    fn routes(app: &mut Fianchetto<Pool<ConnectionManager<PgConnection>>>) {
-        app.get("/partija", |_, _, conn_pool| {
+    fn routes(app: &mut Fianchetto, conn_pool: Arc<Pool<ConnectionManager<PgConnection>>>) {
+        let conn = Arc::clone(&conn_pool);
+        app.get("/partija", move |_, _| {
             let partije: Vec<Partija>;
-            match dsl::partija.load(&conn_pool.unwrap().get().unwrap()) {
+            match dsl::partija.load(&conn.get().unwrap()) {
                 Ok(p) => partije = p,
                 Err(err) => {
                     let err = err.to_string();
@@ -29,12 +32,13 @@ impl Controller for PartijaController {
             Ok(Response::ok(partije_json))
         });
 
-        app.get("/partija/:id", |_, params, conn_pool| {
+        let conn = Arc::clone(&conn_pool);
+        app.get("/partija/:id", move |_, params| {
             let partija_id: i32 = params.find("id").unwrap().parse()?;
             let partija: Partija;
             match dsl::partija
                 .filter(dsl::partija_id.eq(partija_id))
-                .first(&conn_pool.unwrap().get().unwrap())
+                .first(&conn.get().unwrap())
             {
                 Ok(p) => partija = p,
                 Err(err) => {
@@ -48,12 +52,13 @@ impl Controller for PartijaController {
             Ok(Response::ok(partija_json))
         });
 
-        app.get("/partija-turnir/:turnir_id", |_, params, conn_pool| {
+        let conn = Arc::clone(&conn_pool);
+        app.get("/partija-turnir/:turnir_id", move |_, params| {
             let turnir_id: i32 = params.find("turnir_id").unwrap().parse()?;
             let partije: Vec<Partija>;
             match dsl::partija
                 .filter(dsl::turnir_id.eq(turnir_id))
-                .load(&conn_pool.unwrap().get().unwrap())
+                .load(&conn.get().unwrap())
             {
                 Ok(p) => partije = p,
 
@@ -68,23 +73,22 @@ impl Controller for PartijaController {
             Ok(Response::ok(partije_json))
         });
 
-        app.post("/partija", |req, _, conn_pool| {
+        let conn = Arc::clone(&conn_pool);
+        app.post("/partija", move |req, _| {
             let new_partija: NewPartija = serde_json::from_value(req.content)?;
             let partija: Partija =
-                PartijaController::create_partija(&conn_pool.unwrap().get().unwrap(), new_partija)?;
+                PartijaController::create_partija(&conn.get().unwrap(), new_partija)?;
 
             let partija_json = serde_json::to_string(&partija)?;
             Ok(Response::created(partija_json))
         });
 
-        app.put("/partija/:id", |req, params, conn_pool| {
+        let conn = Arc::clone(&conn_pool);
+        app.put("/partija/:id", move |req, params| {
             let partija_id: i32 = params.find("id").unwrap().parse()?;
             let upd_partija: NewPartija = serde_json::from_value(req.content)?;
-            let partija: Partija = PartijaController::update_partija(
-                &conn_pool.unwrap().get().unwrap(),
-                partija_id,
-                upd_partija,
-            )?;
+            let partija: Partija =
+                PartijaController::update_partija(&conn.get().unwrap(), partija_id, upd_partija)?;
 
             let partija_json = serde_json::to_string(&partija)?;
             Ok(Response::ok(partija_json))

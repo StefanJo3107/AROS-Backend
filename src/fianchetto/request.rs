@@ -1,15 +1,15 @@
-use serde_json::{Error, Value};
+use serde_json::Value;
 
 pub struct Request<'a> {
     pub method: &'a str,
     pub path: &'a str,
     pub content_type: &'a str,
     pub content_length: usize,
-    pub content: Value,
+    pub content: serde_json::Value,
 }
 
 impl<'a> Request<'a> {
-    pub fn new(request: &str) -> Result<Request, Error> {
+    pub fn new(request: &str) -> Result<Request, serde_json::Error> {
         let lines: Vec<&str> = request.split("\r\n").collect();
         let first: Vec<&str> = lines.get(0).unwrap().split(" ").collect();
 

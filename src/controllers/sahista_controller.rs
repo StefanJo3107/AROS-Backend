@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::Error;
@@ -13,10 +15,11 @@ use crate::schema::sahista::dsl;
 pub struct SahistaController;
 
 impl Controller for SahistaController {
-    fn routes(app: &mut Fianchetto<Pool<ConnectionManager<PgConnection>>>) {
-        app.get("/sahista", |_, _, conn_pool| {
+    fn routes(app: &mut Fianchetto, conn_pool: Arc<Pool<ConnectionManager<PgConnection>>>) {
+        let conn = Arc::clone(&conn_pool);
+        app.get("/sahista", move |_, _| {
             let sahisti: Vec<Sahista>;
-            match dsl::sahista.load(&conn_pool.unwrap().get().unwrap()) {
+            match dsl::sahista.load(&conn.get().unwrap()) {
                 Ok(s) => sahisti = s,
                 Err(err) => {
                     let err = err.to_string();
@@ -29,34 +32,34 @@ impl Controller for SahistaController {
             Ok(Response::ok(sahisti_json))
         });
 
-        app.get("/sahista/:id", |_, params, conn_pool| {
+        let conn = Arc::clone(&conn_pool);
+        app.get("/sahista/:id", move |_, params| {
             let sahista_id: i32 = params.find("id").unwrap().parse()?;
             let sahista: Sahista = dsl::sahista
                 .filter(dsl::sahista_id.eq(sahista_id))
-                .first(&conn_pool.unwrap().get().unwrap())?;
+                .first(&conn.get().unwrap())?;
 
             let sahista_json = serde_json::to_string(&sahista)?;
             Ok(Response::ok(sahista_json))
         });
 
-        app.post("/sahista", |req, _, conn_pool| {
+        let conn = Arc::clone(&conn_pool);
+        app.post("/sahista", move |req, _| {
             let new_sahista: NewSahista = serde_json::from_value(req.content)?;
             let sahista: Sahista =
-                SahistaController::create_sahista(&conn_pool.unwrap().get().unwrap(), new_sahista)?;
+                SahistaController::create_sahista(&conn.get().unwrap(), new_sahista)?;
 
             let sahista_json = serde_json::to_string(&sahista)?;
             Ok(Response::created(sahista_json))
         });
 
-        app.put("/sahista/:id", |req, params, conn_pool| {
+        let conn = Arc::clone(&conn_pool);
+        app.put("/sahista/:id", move |req, params| {
             let sahista_id: i32 = params.find("id").unwrap().parse().unwrap();
             let upd_sahista: NewSahista = serde_json::from_value(req.content)?;
 
-            let sahista: Sahista = SahistaController::update_sahista(
-                &conn_pool.unwrap().get().unwrap(),
-                sahista_id,
-                upd_sahista,
-            )?;
+            let sahista: Sahista =
+                SahistaController::update_sahista(&conn.get().unwrap(), sahista_id, upd_sahista)?;
 
             let sahista_json = serde_json::to_string(&sahista)?;
             Ok(Response::ok(sahista_json))

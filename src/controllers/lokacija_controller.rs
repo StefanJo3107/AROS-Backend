@@ -1,3 +1,7 @@
+use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
+
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use serde_json::json;
@@ -12,10 +16,20 @@ use super::Controller;
 pub struct LokacijaController;
 
 impl Controller for LokacijaController {
-    fn routes(app: &mut Fianchetto<Pool<ConnectionManager<PgConnection>>>) {
-        app.get("/lokacija", |_, _, conn_pool| {
+    fn routes(app: &mut Fianchetto, conn_pool: Arc<Pool<ConnectionManager<PgConnection>>>) {
+        app.get("/sleep", |_, _| {
+            thread::sleep(Duration::from_secs(5));
+            Ok(Response::ok(String::from("Izvršen sleep")))
+        });
+
+        app.get("/nosleep", |_, _| {
+            Ok(Response::ok(String::from("Izvršen nosleep")))
+        });
+
+        let conn = Arc::clone(&conn_pool);
+        app.get("/lokacija", move |_, _| {
             let results: Vec<Lokacija>;
-            match LokacijaController::get_lokacija(&conn_pool.unwrap().get().unwrap()) {
+            match LokacijaController::get_lokacija(&conn.get().unwrap()) {
                 Ok(res) => results = res,
                 Err(err) => {
                     let err = err.to_string();
@@ -28,12 +42,13 @@ impl Controller for LokacijaController {
             Ok(Response::ok(lok_json))
         });
 
-        app.get("/lokacija/:id", |_, params, conn_pool| {
+        let conn = Arc::clone(&conn_pool);
+        app.get("/lokacija/:id", move |_, params| {
             let lok_id: i32 = params.find("id").unwrap().parse()?;
             let result: Lokacija;
             match lokacija::dsl::lokacija
                 .filter(lokacija::dsl::id.eq(lok_id))
-                .first::<Lokacija>(&conn_pool.unwrap().get().unwrap())
+                .first::<Lokacija>(&conn.get().unwrap())
             {
                 Ok(res) => result = res,
                 Err(err) => {
@@ -47,7 +62,8 @@ impl Controller for LokacijaController {
             Ok(Response::ok(lok_json))
         });
 
-        app.post("/lokacija", |req, _, conn_pool| {
+        let conn = Arc::clone(&conn_pool);
+        app.post("/lokacija", move |req, _| {
             let lok_naziv;
             match req.content["naziv"].as_str() {
                 Some(n) => lok_naziv = n,
@@ -57,8 +73,7 @@ impl Controller for LokacijaController {
                     )?))
                 }
             };
-            let lok =
-                LokacijaController::create_lokacija(&conn_pool.unwrap().get().unwrap(), lok_naziv)?;
+            let lok = LokacijaController::create_lokacija(&conn.get().unwrap(), lok_naziv)?;
 
             let lok_json = serde_json::to_string(&lok)?;
             Ok(Response::created(lok_json))

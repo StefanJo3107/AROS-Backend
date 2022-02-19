@@ -9,13 +9,6 @@ pub struct ThreadPool {
 }
 
 impl ThreadPool {
-    ///Pravi novi ThreadPool.
-    ///
-    /// Parametar size predstavlja broj niti u pool-u
-    ///
-    /// # Panics
-    ///
-    /// Funkcija `new` će "paničiti" ukoliko je size nula
     pub fn new(size: usize) -> ThreadPool {
         assert!(size > 0);
 
